@@ -213,11 +213,12 @@
             setupForm();
           }
           applyLanguage(language);
+          if (addToHistory) window.history.pushState(null, "", addresses[key] + link.hash);
+          // Scroll before the pods animate, so their movement can't throw the position off.
           page.main.classList.remove("is-entering");
+          scrollFor(link.hash);
           void page.main.offsetWidth;
           page.main.classList.add("is-entering");
-          if (addToHistory) window.history.pushState(null, "", addresses[key] + link.hash);
-          scrollFor(link.hash);
           var heading = $("h1", page.main);
           if (heading && !link.hash) {
             heading.setAttribute("tabindex", "-1");
