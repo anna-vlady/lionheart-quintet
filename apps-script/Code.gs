@@ -51,7 +51,8 @@ function clean_(data) {
   };
   const digits = signup.phone.replace(/\D/g, '').length;
   const valid =
-    signup.name.length >= 1 && signup.name.length <= 100 &&
+    signup.name.length <= 100 &&
+    signup.name.split(/\s+/).filter((word) => /\p{L}/u.test(word)).length >= 2 &&
     Object.prototype.hasOwnProperty.call(WEIGHTS, signup.gender) &&
     WEIGHTS[signup.gender].indexOf(signup.weight) !== -1 &&
     /^[+\d\s().-]{7,25}$/.test(signup.phone) && digits >= 7 && digits <= 15 &&

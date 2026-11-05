@@ -295,7 +295,11 @@
 
     var checks = {
       name: function () {
-        return $("#name", form).value.trim().length > 0 ? "" : "errName";
+        // First and last name: at least two words that contain a letter, in any alphabet.
+        var words = $("#name", form).value.trim().split(/\s+/).filter(function (word) {
+          return /\p{L}/u.test(word);
+        });
+        return words.length >= 2 ? "" : "errName";
       },
       weight: function () {
         return state.weight ? "" : "errWeight";
