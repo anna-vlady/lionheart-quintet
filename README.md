@@ -11,9 +11,8 @@ Sign-up site for the Lion Heart Quintet grappling tournament. Plain HTML, CSS an
 ## Before going live
 
 1. Connect sign-ups (below).
-2. Have the Russian and Armenian checked by native speakers. Both are drafts.
-3. Add the waiver. The form asks people to agree to one, but the site has no waiver text yet.
-4. Set the date in `assets/js/i18n.js` (`datePill` and `dateValue`, in all three languages).
+2. Have the Russian and Armenian checked by native speakers. Both are drafts. The waiver PDF (`assets/docs`) is English only.
+3. Set the date in `assets/js/i18n.js` (`datePill` and `dateValue`, in all three languages).
 
 ## Connect sign-ups: Google Sheet and Telegram
 
