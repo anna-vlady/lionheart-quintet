@@ -39,8 +39,6 @@
   }
 }
 
-@view-transition { navigation: auto; }
-
 *, *::before, *::after { box-sizing: border-box; }
 [hidden] { display: none !important; }
 
@@ -476,50 +474,59 @@ label.field { cursor: text; }
 
 .slide:active { cursor: grabbing; }
 
-/* The circle is see-through, so neither bar may run behind it: the track is what's
-   left to slide and the fill is what's done, and they meet at the circle's edges. */
-.slide__track, .slide__fill {
+/* The bars and circle are solid inside one see-through group. Overlaps can't darken,
+   so there are no seams or stray shadows. Only transforms animate, so sliding never
+   triggers a layout. */
+.slide__shape {
   position: absolute;
-  top: 12px;
-  height: 24px;
-  transition: left var(--spring-time) var(--spring), width var(--spring-time) var(--spring);
+  inset: 0;
+  opacity: 0.64;
 }
 
 .slide__track {
-  right: 0;
-  left: calc(var(--slide-x, 0px) * 1.1 + 44px);
-  border-radius: 0 12px 12px 0;
-  background: rgba(var(--ink-rgb), 0.22);
-}
-
-.slide__fill {
+  position: absolute;
+  top: 12px;
   left: 0;
-  width: calc(var(--slide-x, 0px) * 1.1);
-  border-radius: 12px 0 0 12px;
-  background: var(--glass-dark);
+  right: 0;
+  height: 24px;
+  overflow: hidden;
+  border-radius: 12px;
+  background: rgb(151, 147, 147);
 }
 
-.slide.is-dragging .slide__track, .slide.is-dragging .slide__fill { transition: none; }
+/* Its right edge always stays hidden under the circle. */
+.slide__fill {
+  position: absolute;
+  inset: 0;
+  background: var(--ink);
+  transform: translateX(calc(var(--slide-x, 0px) - 64px));
+  transition: transform var(--spring-time) var(--spring);
+  will-change: transform;
+}
 
-.slide__thumb {
+.slide__thumb, .slide__icon {
   position: absolute;
   top: 0;
   left: 0;
   width: 48px;
   height: 48px;
-  display: grid;
-  place-items: center;
   border-radius: 50%;
-  color: #fff;
-  background: var(--glass-dark);
-  border: 1px solid var(--glass-dark-border);
-  -webkit-backdrop-filter: blur(4px);
-  backdrop-filter: blur(4px);
   transform: translateX(var(--slide-x, 0px));
   transition: transform var(--spring-time) var(--spring);
+  will-change: transform;
 }
 
-.slide.is-dragging .slide__thumb { transition: none; }
+.slide__thumb { background: var(--ink); }
+
+.slide__icon {
+  display: grid;
+  place-items: center;
+  color: #fff;
+}
+
+.slide.is-dragging .slide__fill,
+.slide.is-dragging .slide__thumb,
+.slide.is-dragging .slide__icon { transition: none; }
 
 .slide[aria-checked="true"] { --slide-x: var(--travel); }
 
@@ -539,8 +546,6 @@ label.field { cursor: text; }
   color: #fff;
   background: var(--glass-dark);
   border: 1px solid var(--glass-dark-border);
-  -webkit-backdrop-filter: blur(4px);
-  backdrop-filter: blur(4px);
   font-size: 18px;
   font-weight: 500;
   line-height: 24px;
@@ -676,8 +681,20 @@ label.field { cursor: text; }
 .select__button:active .field__action, .row--link:active .field__action { transform: scale(0.88); transition-duration: 0.1s; }
 .row--link:active { transform: scale(0.985); transition-duration: 0.1s; }
 
-.lang__panel:not([hidden]) { transform-origin: top right; animation: pop var(--spring-time) var(--spring) both; }
-.select__panel:not([hidden]) { transform-origin: top center; animation: pop var(--spring-time) var(--spring) both; }
+.lang__panel:not([hidden]) { transform-origin: top right; animation: pop var(--spring-time) var(--spring) backwards; }
+.select__panel:not([hidden]) { transform-origin: top center; animation: pop var(--spring-time) var(--spring) backwards; }
+
+/* Each pod animates on its own: fading their parent would switch off their glass blur. */
+.layout.is-entering > .pod { animation: page-in 0.5s var(--spring) backwards; }
+.layout.is-entering > .pod:nth-child(2) { animation-delay: 0.04s; }
+.layout.is-entering > .pod:nth-child(3) { animation-delay: 0.08s; }
+
+@keyframes page-in {
+  from { opacity: 0; transform: translateY(14px) scale(0.985); }
+  to { opacity: 1; transform: none; }
+}
+
+h1:focus { outline: 0; }
 
 @keyframes pop {
   from { opacity: 0; transform: scale(0.88) translateY(-8px); }
@@ -693,5 +710,4 @@ label.field { cursor: text; }
   .select__button:active .field__action, .row--link:active .field__action,
   .menu__item:active, .toggle__item:active span, .button:active:not([disabled]),
   .select__option:active, .row--link:active { transform: none; }
-  @view-transition { navigation: none; }
 }

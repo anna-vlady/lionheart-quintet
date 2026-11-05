@@ -103,56 +103,162 @@
     });
   }
 
-  // ---------- Menu ----------
+  // ---------- Pages and menu ----------
 
-  function setupMenu() {
+  // Switching page swaps the content and leaves the menu on screen, so the pill can
+  // finish its bounce. Each page is kept once loaded, so details typed into the form
+  // survive a trip to Info and back. If anything fails, the link just loads normally.
+
+  function pageKey(url) {
+    var path = new URL(url, window.location.href).pathname.replace(/\.html$/, "").replace(/\/index$/, "/");
+    return path || "/";
+  }
+
+  function setupNavigation() {
     var menu = $(".menu");
     var pill = $("[data-menu-pill]");
-    if (!menu || !pill) return;
     var items = $$(".menu__item", menu);
-    var calm = window.matchMedia("(prefers-reduced-motion: reduce)");
+    var pages = {};
+    var addresses = {};
+    var loading = {};
+    var currentKey = pageKey(window.location.href);
+    var latest = 0;
 
-    function moveTo(item) {
-      pill.style.setProperty("--pill-x", item.offsetLeft + "px");
-      pill.style.setProperty("--pill-width", item.offsetWidth + "px");
+    pages[currentKey] = { main: $("main"), ready: true };
+    addresses[currentKey] = window.location.pathname;
+
+    function itemFor(key) {
+      return items.filter(function (item) {
+        return pageKey(item.href) === key;
+      })[0];
     }
 
-    // Puts the pill on the current page without animating.
+    function isOurPage(url) {
+      return Boolean(itemFor(pageKey(url)));
+    }
+
+    function moveTo(item, instant) {
+      var x = item.offsetLeft + "px";
+      var width = item.offsetWidth + "px";
+      // Re-placing the pill at the same spot must not cancel a bounce in progress.
+      if (pill.style.getPropertyValue("--pill-x") === x && pill.style.getPropertyValue("--pill-width") === width) return;
+      if (instant) pill.classList.add("no-motion");
+      pill.style.setProperty("--pill-x", x);
+      pill.style.setProperty("--pill-width", width);
+      if (instant) {
+        void pill.offsetWidth;
+        pill.classList.remove("no-motion");
+      }
+    }
+
     function settle() {
-      var current = $('.menu__item[aria-current="page"]', menu) || items[0];
-      pill.classList.add("no-motion");
-      moveTo(current);
-      void pill.offsetWidth;
-      pill.classList.remove("no-motion");
+      var current = itemFor(currentKey) || items[0];
+      moveTo(current, true);
     }
 
-    items.forEach(function (item) {
-      item.addEventListener("click", function (event) {
-        if (item.getAttribute("aria-current") === "page") {
-          event.preventDefault();
-          return;
-        }
-        if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || calm.matches) return;
-        // Let the pill bounce across before the page changes.
-        event.preventDefault();
-        item.classList.add("is-target");
-        moveTo(item);
-        window.setTimeout(function () {
-          window.location.href = item.href;
-        }, 320);
+    function load(key, url) {
+      if (pages[key]) return Promise.resolve(pages[key]);
+      if (loading[key]) return loading[key];
+      loading[key] = fetch(url)
+        .then(function (response) {
+          if (!response.ok) throw new Error("Status " + response.status);
+          addresses[key] = new URL(response.url).pathname;
+          return response.text();
+        })
+        .then(function (html) {
+          var main = new DOMParser().parseFromString(html, "text/html").querySelector("main");
+          if (!main) throw new Error("No content");
+          pages[key] = { main: document.importNode(main, true), ready: false };
+          return pages[key];
+        })
+        .catch(function (error) {
+          delete loading[key];
+          throw error;
+        });
+      return loading[key];
+    }
+
+    function scrollFor(hash) {
+      var target = hash && document.getElementById(hash.slice(1));
+      if (target) target.scrollIntoView();
+      else window.scrollTo(0, 0);
+    }
+
+    function goTo(url, addToHistory) {
+      var link = new URL(url, window.location.href);
+      var key = pageKey(link.href);
+      var fromKey = currentKey;
+      var request = ++latest;
+
+      if (key === currentKey) {
+        if (addToHistory && link.hash) window.history.pushState(null, "", link.hash);
+        scrollFor(link.hash);
+        return;
+      }
+
+      // The pill moves straight away, whether or not the content has arrived.
+      items.forEach(function (item) {
+        if (pageKey(item.href) === key) item.setAttribute("aria-current", "page");
+        else item.removeAttribute("aria-current");
       });
+      moveTo(itemFor(key));
+
+      load(key, link.href)
+        .then(function (page) {
+          if (request !== latest) return; // Someone has already clicked somewhere else.
+          pages[currentKey].main.replaceWith(page.main);
+          currentKey = key;
+          if (!page.ready) {
+            page.ready = true;
+            setupForm();
+          }
+          applyLanguage(language);
+          page.main.classList.remove("is-entering");
+          void page.main.offsetWidth;
+          page.main.classList.add("is-entering");
+          if (addToHistory) window.history.pushState(null, "", addresses[key] + link.hash);
+          scrollFor(link.hash);
+          var heading = $("h1", page.main);
+          if (heading && !link.hash) {
+            heading.setAttribute("tabindex", "-1");
+            heading.focus({ preventScroll: true });
+          }
+        })
+        .catch(function () {
+          if (request !== latest) return;
+          currentKey = fromKey;
+          window.location.href = link.href;
+        });
+    }
+
+    document.addEventListener("click", function (event) {
+      var link = event.target.closest && event.target.closest("a[href]");
+      if (!link || event.defaultPrevented || event.button !== 0) return;
+      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || link.target) return;
+      if (new URL(link.href).origin !== window.location.origin || !isOurPage(link.href)) return;
+      event.preventDefault();
+      goTo(link.href, true);
+    });
+
+    window.addEventListener("popstate", function () {
+      goTo(window.location.href, false);
     });
 
     settle();
     document.addEventListener("lh:language", settle);
     window.addEventListener("resize", settle);
-    window.addEventListener("pageshow", function () {
-      items.forEach(function (item) {
-        item.classList.remove("is-target");
-      });
-      settle();
-    });
+    window.addEventListener("pageshow", settle);
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(settle);
+
+    // Fetch the other page ahead of time so switching is instant.
+    var other = items.filter(function (item) {
+      return pageKey(item.href) !== currentKey;
+    })[0];
+    if (other) {
+      load(pageKey(other.href), other.href).catch(function () {
+        /* It will be tried again on click. */
+      });
+    }
   }
 
   // ---------- Form ----------
@@ -532,6 +638,6 @@
 
   setupLanguageMenu();
   setupForm();
-  setupMenu();
   applyLanguage(readSavedLanguage() || "en");
+  setupNavigation();
 })();
