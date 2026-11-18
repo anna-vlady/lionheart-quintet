@@ -283,6 +283,21 @@
       if (cleaned !== telegram.value) telegram.value = cleaned;
     });
 
+    var age = $("#age", form);
+    age.addEventListener("input", function () {
+      var cleaned = age.value.replace(/\D/g, "").slice(0, 2);
+      if (cleaned !== age.value) age.value = cleaned;
+    });
+
+    // Optional. Accepts "name", "@name" or a pasted profile link, and keeps just the username.
+    var instagram = $("#instagram", form);
+    function instagramHandle() {
+      return instagram.value.trim()
+        .replace(/^(https?:\/\/)?(www\.)?instagram\.com\//i, "")
+        .replace(/[/?#].*$/, "")
+        .replace(/^@+/, "");
+    }
+
     $$('input[name="gender"]', form).forEach(function (radio) {
       radio.addEventListener("change", function () {
         state.gender = radio.value;
@@ -301,6 +316,10 @@
         });
         return words.length >= 2 ? "" : "errName";
       },
+      age: function () {
+        var value = Number(age.value);
+        return /^\d+$/.test(age.value) && value >= 10 && value <= 99 ? "" : "errAge";
+      },
       weight: function () {
         return state.weight ? "" : "errWeight";
       },
@@ -310,6 +329,10 @@
       },
       telegram: function () {
         return /^[A-Za-z0-9_]{5,32}$/.test(telegram.value.trim()) ? "" : "errTelegram";
+      },
+      instagram: function () {
+        var handle = instagramHandle();
+        return !handle || /^[A-Za-z0-9._]{1,30}$/.test(handle) ? "" : "errInstagram";
       },
       consent: function () {
         return state.agreed ? "" : "errConsent";
@@ -340,7 +363,7 @@
       control.removeAttribute("aria-invalid");
     }
 
-    ["name", "phone", "telegram"].forEach(function (name) {
+    ["name", "age", "phone", "telegram", "instagram"].forEach(function (name) {
       $("#" + name, form).addEventListener("input", function () {
         if (activeErrors[name] && !checks[name]()) clearFieldError(name);
       });
@@ -369,7 +392,7 @@
 
     function validate() {
       var firstInvalid = null;
-      ["name", "weight", "phone", "telegram", "consent"].forEach(function (name) {
+      ["name", "age", "weight", "phone", "telegram", "instagram", "consent"].forEach(function (name) {
         var key = checks[name]();
         if (key) {
           showFieldError(name, key);
@@ -408,10 +431,12 @@
         headers: { "Content-Type": "text/plain;charset=utf-8" },
         body: JSON.stringify({
           name: $("#name", form).value.trim(),
+          age: Number(age.value),
           gender: state.gender,
           weight_class: state.weight.replace("−", "-") + " kg",
           phone: $("#phone", form).value.trim(),
           telegram: "@" + telegram.value.trim(),
+          instagram: instagramHandle() ? "@" + instagramHandle() : "",
           language: LANGS[language],
           agreed_to_rules_and_waiver: true,
         }),

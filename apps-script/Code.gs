@@ -3,7 +3,8 @@
 // Setup steps are in README.md. The bot token lives in Script Properties, never in this code.
 
 const SHEET_NAME = 'Sign-ups';
-const HEADERS = ['Submitted', 'Name', 'Gender', 'Weight class', 'Phone', 'Telegram', 'Language', 'Agreed to rules and waiver'];
+// New columns go at the end, so rows saved before they were added stay lined up.
+const HEADERS = ['Submitted', 'Name', 'Gender', 'Weight class', 'Phone', 'Telegram', 'Language', 'Agreed to rules and waiver', 'Age', 'Instagram'];
 const WEIGHTS = {
   male: ['-60 kg', '-65 kg', '-70 kg', '-76 kg', '-83 kg', '-91 kg', '-100 kg', '+100 kg'],
   female: ['-50 kg', '-55 kg', '-60 kg', '-65 kg', '-70 kg', '+70 kg'],
@@ -48,10 +49,14 @@ function clean_(data) {
     phone: text(data.phone),
     telegram: text(data.telegram),
     language: text(data.language),
+    age: typeof data.age === 'number' ? data.age : NaN,
+    instagram: text(data.instagram),
   };
   const digits = signup.phone.replace(/\D/g, '').length;
   const valid =
     signup.name.length <= 100 &&
+    Number.isInteger(signup.age) && signup.age >= 10 && signup.age <= 99 &&
+    (signup.instagram === '' || /^@[A-Za-z0-9._]{1,30}$/.test(signup.instagram)) &&
     signup.name.split(/\s+/).filter((word) => /\p{L}/u.test(word)).length >= 2 &&
     Object.prototype.hasOwnProperty.call(WEIGHTS, signup.gender) &&
     WEIGHTS[signup.gender].indexOf(signup.weight) !== -1 &&
@@ -69,16 +74,17 @@ function save_(signup) {
   // Plain text, so "+374...", "-60 kg", "@name" or a name starting with "=" stay exactly as typed.
   sheet.getRange(row, 2, 1, HEADERS.length - 1)
     .setNumberFormat('@')
-    .setValues([[signup.name, signup.gender, signup.weight, signup.phone, signup.telegram, signup.language, 'Yes']]);
+    .setValues([[signup.name, signup.gender, signup.weight, signup.phone, signup.telegram, signup.language, 'Yes', String(signup.age), signup.instagram]]);
 }
 
 function getSheet_() {
   const book = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = book.getSheetByName(SHEET_NAME) || book.insertSheet(SHEET_NAME);
-  if (sheet.getLastRow() === 0) {
-    sheet.appendRow(HEADERS);
+  const header = sheet.getRange(1, 1, 1, HEADERS.length);
+  // Writes the header row on a new sheet, and adds any new column titles to an existing one.
+  if (header.getValues()[0].join('|') !== HEADERS.join('|')) {
+    header.setValues([HEADERS]).setFontWeight('bold');
     sheet.setFrozenRows(1);
-    sheet.getRange(1, 1, 1, HEADERS.length).setFontWeight('bold');
   }
   return sheet;
 }
@@ -88,10 +94,12 @@ function alert_(signup) {
     'New Lion Heart Quintet sign-up',
     '',
     'Name: ' + signup.name,
+    'Age: ' + signup.age,
     'Gender: ' + signup.gender,
     'Weight class: ' + signup.weight,
     'Phone: ' + signup.phone,
     'Telegram: ' + signup.telegram,
+    'Instagram: ' + (signup.instagram || '-'),
     'Language: ' + signup.language,
   ].join('\n'));
 }
